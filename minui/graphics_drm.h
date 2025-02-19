@@ -74,6 +74,12 @@ class GRSurfaceDrm : public GRSurface {
 
 class MinuiBackendDrm : public MinuiBackend {
  public:
+#ifdef PIPA_DEVICE
+  bool UseAtomicDrmApi() const { return true; }
+#else
+  bool UseAtomicDrmApi() const { return false; }
+#endif
+
   MinuiBackendDrm() = default;
   ~MinuiBackendDrm() override;
 

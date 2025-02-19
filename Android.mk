@@ -94,3 +94,11 @@ endif
 
 include $(BUILD_PHONY_PACKAGE)
 
+include $(CLEAR_VARS)
+LOCAL_MODULE := libminui
+
+ifeq ($(TARGET_DEVICE),pipa)
+    LOCAL_CFLAGS += -DPIPA_DEVICE
+    LOCAL_CFLAGS += -DUSE_DRM_ATOMIC
+endif
+

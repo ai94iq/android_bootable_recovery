@@ -816,14 +816,49 @@ GRSurface* MinuiBackendDrm::Init() {
 
   Blank(false);
 
+#ifdef PIPA_DEVICE
+    if (!InitializeAtomicDrm()) {
+        LOG(ERROR) << "Failed to initialize atomic DRM";
+        return nullptr;
+    }
+#else
+    if (!InitializeLegacyDrm()) {
+        LOG(ERROR) << "Failed to initialize legacy DRM";
+        return nullptr;
+    }
+#endif
+
   return drm[DRM_MAIN].GRSurfaceDrms[0].get();
 }
 
 GRSurface* MinuiBackendDrm::Flip() {
-  UpdatePlaneFB(active_display);
+#ifdef PIPA_DEVICE
+    // Atomic DRM implementation
+    if (current_buffer_ == 0) {
+        current_buffer_ = 1;
+    } else {
+        current_buffer_ = 0;
+    }
 
-  drm[active_display].current_buffer = 1 - drm[active_display].current_buffer;
-  return drm[active_display].GRSurfaceDrms[drm[active_display].current_buffer].get();
+    auto ret = drmModeAtomicCommit(drm_fd_, atomic_req_,
+                                  DRM_MODE_ATOMIC_NONBLOCK, nullptr);
+    if (ret != 0) {
+        LOG(ERROR) << "Failed to commit atomic changes: " << strerror(errno);
+        return nullptr;
+    }
+#else
+    // Legacy DRM implementation
+    int ret = drmModeSetCrtc(drm_fd_, drm[0].monitor_crtc->crtc_id,
+                            drm[0].GRSurfaceDrms[current_buffer_]->fb_id,
+                            0, 0, &drm[0].monitor_connector->connector_id, 1,
+                            &drm[0].monitor_crtc->mode);
+    if (ret) {
+        LOG(ERROR) << "Failed to set crtc: " << strerror(errno);
+        return nullptr;
+    }
+#endif
+
+    return drm[0].GRSurfaceDrms[current_buffer_].get();
 }
 
 MinuiBackendDrm::~MinuiBackendDrm() {
